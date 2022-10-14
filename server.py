@@ -12,42 +12,49 @@ CORS(app)
 
 @app.post("/api/update/members")
 def update_members():
-    try:
-        member_list = request.get_json()
-        db_members = database.members.find({})
-        print("Current members list:")
+    
+    member_list = request.get_json()
+    
+    if member_list:
+        print(member_list)
         
-        current_db_usernames = []
-        current_users = []
-        
-        #build list of username currently in the database
-        if db_members:
-            for member in db_members:
-                current_db_usernames.append(member['username'])
-                print(member['username'])
-                
-        # build a list of usernames from the current members list received from discord       
-        for member in member_list:
-            current_users.append(member['username'])
-        
-        for member in current_db_usernames:
-            if member not in current_users:
-                database.members.find_one_and_delete({'username' : str(member)})
-                
-        
-        # add new member if not present in the list
-        for member in member_list:
-            if member['username'] != 'None':
-                if member['username'] not in current_db_usernames:
-                    # member['_id'] = str(member['_id'])
+        try:
+            cursor = database.members.find({})
+            print("Current members list:")
+            
+            current_db_usernames = []
+            current_users = []
+            
+            #build list of username currently in the database
+            if cursor:
+                print("building database member list...")
+                for member in cursor:
+                    current_db_usernames.append(str(member['username']).lower())
+                    
+            print('building member list...')
+            # build a list of usernames from the current members list received from discord
+            for member in member_list:
+                current_users.append(str(member['username']).lower())
+                    
+            if current_db_usernames:
+                for member in current_db_usernames:
+                    if member not in current_users:
+                        database.members.find_one_and_delete({'username' : str(member)})
+                    
+            
+            # add new member if not present in the list
+            for member in member_list:
+                if str(member) not in current_db_usernames:
                     database.members.insert_one(member)
                     print(member)
+                
+            print(member_list)
+                
+            return json.dumps("Updates completed")
+        except Exception as e:
+            print(e)
             
-        print(member_list)
-            
-        return json.dumps("Complete")
-    except Exception as e:
-        print(e)
+    return json.dumps("Member data did not load properly.  Did you trying turning if off and back on again?")
         
         
 @app.post("/api/update/member")
@@ -90,12 +97,23 @@ def update_member():
         if user_from_db:
             updated_user = database.members.find_one_and_update({'username' : user_data['username']}, {'$set': {'class': str(user_data['class']), 'primary': str(classes[int(primary_index)]), 'augment': str(classes[int(augment_index)])}})
             
-            # format data to be returned to discord
-            return_data = str(updated_user['username'] + ':  Class: ' + str(updated_user['class']).upper() + ' Primary: ' + str(updated_user['primary']).upper() + ' Augment: ' + str(updated_user['augment']).upper())
+            # format data to be returned to discord for testing purposes
+            return_data = 'Success! Your class has been updated to ' + str(user_data['class']).upper() + '.'
         
-        return json.dumps('Success! Your class has been updated.')
+        return json.dumps(return_data)
         
     except Exception as e:
         print(e)
+        
+@app.get('/api/get-user-class/<username>')
+def get_user_class(username):
+    
+    user = database.members.find_one({'username': str(username)})
+    user['_id'] = str(user['_id'])
+    
+    response_string = user['username'] + " - Class: " + str(user['class']).upper() + " (Primary: " + str(user['primary']).upper() + ', Augment: ' + str(user['augment']).upper() + ')'
+    
+    print(user)
+    return json.dumps(response_string)
 
 app.run(debug=True)
