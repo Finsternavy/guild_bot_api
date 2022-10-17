@@ -78,7 +78,7 @@ def update_guild_stats():
                 guild_class_stats['primary_dps_support'] += 1
                 
                 if str(member['secondary_role']) == 'tank':
-                    guild_class_stats['DPS/Support'].append(name_and_class + ' (Augmented Tank')
+                    guild_class_stats['tanks'].append(name_and_class + ' (Augmented Tank)')
                     guild_class_stats['augmented_tanks'] += 1
                     
                 else:
@@ -117,8 +117,6 @@ def update_members():
                 print("building database member list...")
                 for member in cursor:
                     current_db_usernames.append(str(member['username']).lower())
-                    print('line 33:')
-                    print(member['username'])
                     
             print('building member list...')
             # build a list of usernames from the current members list received from discord
@@ -177,6 +175,34 @@ def get_tanks():
         tanks = stats['tanks']
     
     return json.dumps(tanks)
+
+
+@app.get("/api/guild/dps-support")
+def get_dps_support():
+    
+    cursor = database.guild_stats.find({})
+    
+    dps_support = {}
+    
+    for member in cursor:
+        member['_id'] = str(member['_id'])
+        dps_support = member['DPS/Support']
+    
+    return json.dumps(dps_support)
+
+
+@app.get("/api/guild/healers")
+def get_healers():
+    
+    cursor = database.guild_stats.find({})
+    
+    healers = {}
+    
+    for member in cursor:
+        member['_id'] = str(member['_id'])
+        healers = member['healers']
+    
+    return json.dumps(healers)
 
 
         
@@ -286,5 +312,40 @@ def clear_user_class(username):
         database.members.find_one_and_update({'username': str(username)}, {'$set': {'class': '', 'primary': '', 'augment': ''}})
         response_string = 'Class cleared successfully!'
         return json.dumps(response_string)
+    
+
+@app.get('/api/guild/get-class/<search_class>')
+def get_all_who_play_class(search_class):
+    
+    cursor = database.members.find({})
+    
+    search_class = str(search_class).lower()
+    
+    members = []
+    
+    for member in cursor:
+        
+        if str(member['primary']) == str(search_class) or str(member['augment']) == str(search_class):
+            member_string = str(member['username']) + ' : ' + str(member['class']).upper() + ' (Primary: ' + str(member['primary']).upper() + ', Augment: ' + str(member['augment']).upper() + ')'
+            members.append(member_string)
+            
+    return json.dumps(members)
+
+
+@app.get('/api/guild/get-true-class/<search_class>')
+def get_true_class(search_class):
+    
+    cursor = database.members.find({})
+    
+    search_class = str(search_class).lower()
+    
+    members = []
+    
+    for member in cursor:
+        if str(member['primary']) == str(search_class) and str(member['augment']) == str(search_class):
+            member_string = str(member['username']) + ' : ' + str(member['class']).upper() + ' (Primary: ' + str(member['primary']).upper() + ', Augment: ' + str(member['augment']).upper() + ')'
+            members.append(member_string)
+            
+    return json.dumps(members)
 
 app.run(debug=True)
